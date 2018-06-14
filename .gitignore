@@ -1,5 +1,9 @@
 .idea/
+upload/
+backend/pkg/
+backend/src/github.com/
 .DS_Store
 filenametosaveas
+backend/env
 
 
