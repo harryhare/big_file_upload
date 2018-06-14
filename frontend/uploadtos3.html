@@ -12,7 +12,7 @@
             var url =  "http://localhost:8080" + "/uploadtos3"; // 接收上传文件的后台地址
 
             var form = new FormData(); // FormData 对象
-            //form.append("filename",fileObj.Name);
+            form.append("filename",fileObj.name);
             form.append("file", fileObj); // 文件对象
 
             xhr = new XMLHttpRequest();  // XMLHttpRequest 对象

@@ -80,6 +80,7 @@ func upload(sess *session.Session)  {
 		exitErrorf("Unable to upload %q to %q, %v", filename, bucket, err)
 	}
 
+
 	fmt.Printf("Successfully uploaded %q to %q\n", filename, bucket)
 }
 
@@ -105,6 +106,12 @@ func download(sess *session.Session)  {
 	fmt.Println("Downloaded", downloadfile.Name(), numBytes, "bytes")
 }
 
+func DeleteMultiPart(){
+	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String("us-east-1")}))
+
+	svc := s3manager.(sess)
+}
+
 func Test() {
 	//var bucket string
 	//var key string
@@ -125,7 +132,7 @@ func Test() {
 	// Session should be shared where possible to take advantage of
 	// configuration and credential caching. See the session package for
 	// more information.
-	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String("us-east-1")}))
+
 
 	// Create a new instance of the service's client with a Session.
 	// Optional aws.Config values can also be provided as variadic arguments
