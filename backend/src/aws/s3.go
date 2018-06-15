@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
+var Bucket string= "paradox42"
 // Uploads a file to S3 given a bucket and object key. Also takes a duration
 // value to terminate the update if it doesn't complete within that time.
 //
@@ -106,12 +107,6 @@ func download(sess *session.Session)  {
 	fmt.Println("Downloaded", downloadfile.Name(), numBytes, "bytes")
 }
 
-func DeleteMultiPart(){
-	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String("us-east-1")}))
-
-	svc := s3manager.(sess)
-}
-
 func Test() {
 	//var bucket string
 	//var key string
@@ -133,6 +128,7 @@ func Test() {
 	// configuration and credential caching. See the session package for
 	// more information.
 
+	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String("us-east-1")}))
 
 	// Create a new instance of the service's client with a Session.
 	// Optional aws.Config values can also be provided as variadic arguments

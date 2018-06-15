@@ -9,10 +9,11 @@
         //上传文件方法
         function UpladFile() {
             var fileObj = document.getElementById("file").files[0]; // js 获取文件对象
-            var url =  "http://localhost:8080" + "/uploadtos3"; // 接收上传文件的后台地址
+            var url =  "http://localhost:8080" + "/api/s3/multi/upload"; // 接收上传文件的后台地址
 
             var form = new FormData(); // FormData 对象
-            form.append("filename",fileObj.name);
+            form.append("key",fileObj.name);
+            form.append("len",fileObj.size.toString());
             form.append("file", fileObj); // 文件对象
 
             xhr = new XMLHttpRequest();  // XMLHttpRequest 对象

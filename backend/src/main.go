@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"log"
 	"handler"
+	"mockdb"
 )
 
 
@@ -26,6 +27,9 @@ func Index(w http.ResponseWriter, r *http.Request) {
 
 
 func main() {
+	mockdb.Load()
+	defer mockdb.Save()
+
 	http.HandleFunc("/",Index)
 	http.HandleFunc("/upload", handler.UploadLocal)
 	http.HandleFunc("/uploadtos3",  handler.UploadS3)
