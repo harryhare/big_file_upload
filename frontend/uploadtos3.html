@@ -14,6 +14,7 @@
             var form = new FormData(); // FormData 对象
             form.append("key",fileObj.name);
             form.append("len",fileObj.size.toString());
+            form.append("start",1);
             form.append("file", fileObj); // 文件对象
 
             xhr = new XMLHttpRequest();  // XMLHttpRequest 对象

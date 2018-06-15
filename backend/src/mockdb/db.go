@@ -20,11 +20,11 @@ type S3Object struct {
 var m map[string]*S3Object
 
 func Create(key string, reserve int,id *string){
-	m[key]=&S3Object{Parts:make([]*S3Part,0,reserve),Id:id}
+	m[key]=&S3Object{Parts:make([]*S3Part,reserve,reserve),Id:id}
 }
 
 func Add(key string,part *S3Part)  {
-	m[key].Parts=append(m[key].Parts,part)
+	m[key].Parts[part.PartNumber-1]=part
 }
 
 func Get(key string)*S3Object{
