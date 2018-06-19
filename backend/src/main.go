@@ -27,6 +27,9 @@ func Index(w http.ResponseWriter, r *http.Request) {
 
 
 func main() {
+	//aws.Test()
+	//os.Exit(0)
+
 	mockdb.Load()
 	defer mockdb.Save()
 

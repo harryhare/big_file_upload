@@ -47,19 +47,41 @@ func list_buckets(sess *session.Session){
 func list_object(sess *session.Session){
 	svc := s3.New(sess)
 	bucket:="paradox42"
+	//bucket:="unity-connect-int"
 	resp, err := svc.ListObjects(&s3.ListObjectsInput{Bucket: aws.String(bucket)})
 	if err != nil {
 		exitErrorf("Unable to list items in bucket %q, %v", bucket, err)
 	}
 
-	for _, item := range resp.Contents {
+	fmt.Printf("total: %d ojbects\n",len(resp.Contents))
+	//for _, item := range resp.Contents {
+	//	fmt.Println("Name:         ", *item.Key)
+	//	fmt.Println("Last modified:", *item.LastModified)
+	//	fmt.Println("Size:         ", *item.Size)
+	//	fmt.Println("Storage class:", *item.StorageClass)
+	//	fmt.Println("Owner:        ", item.Owner)
+	//}
+}
+
+//multipart in progress
+func list_mulitpart(sess *session.Session){
+	svc := s3.New(sess)
+	bucket:="paradox42"
+	//bucket:="unity-connect-int"
+	resp, err := svc.ListMultipartUploads(&s3.ListMultipartUploadsInput{Bucket: aws.String(bucket)})
+	if err != nil {
+		exitErrorf("Unable to list items in bucket %q, %v", bucket, err)
+	}
+
+	for index, item := range resp.Uploads{
+		fmt.Printf("%d:         \n", index)
 		fmt.Println("Name:         ", *item.Key)
-		fmt.Println("Last modified:", *item.LastModified)
-		fmt.Println("Size:         ", *item.Size)
+		fmt.Println("Last modified:", *item.UploadId)
 		fmt.Println("Storage class:", *item.StorageClass)
 		fmt.Println("Owner:        ", item.Owner)
 	}
 }
+
 
 func upload(sess *session.Session)  {
 	bucket:="paradox42"
@@ -135,7 +157,9 @@ func Test() {
 	// to the New function. This option allows you to provide service
 	// specific configuration.
 
-	list_buckets(sess)
+	//list_buckets(sess)
+	list_mulitpart(sess)
+	list_object(sess)
 
 
 

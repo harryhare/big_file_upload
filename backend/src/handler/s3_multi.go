@@ -94,53 +94,62 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 		//id := r.Form.Get("id")
 		file, _, err := r.FormFile("file")
 		if err != nil {
+			fmt.Printf("form file error %v:",err)
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		defer file.Close()
 		key := r.Form.Get("key")
 		if key == "" {
+			fmt.Println("file key is null")
 			http.Error(w, "file key is null", 500)
 			return
 		}
 		len_str := r.Form.Get("len")
 		if key == "" {
+			fmt.Println("file len is null")
 			http.Error(w, "file len is null", 500)
 			return
 		}
-		len, err := strconv.Atoi(len_str)
+		length, err := strconv.Atoi(len_str)
 		if (err != nil) {
+			fmt.Println("file len is not int")
 			http.Error(w, "file len is not int", 500)
 			return
 		}
 		start_str := r.Form.Get("start")
 		if key == "" {
+			fmt.Println("start is null")
 			http.Error(w, "start is null", 500)
 			return
 		}
 		start, err := strconv.Atoi(start_str)
 		if (err != nil) {
+			fmt.Println("start is not int")
 			http.Error(w, "start is not int", 500)
 			return
 		}
 		sess := session.Must(session.NewSession(&aws.Config{Region: aws.String("us-east-1")}))
 		svc := s3.New(sess)
 
-		err=createMultipartUplaod(w,key,svc,len)
+		err=createMultipartUplaod(w,key,svc,length)
 		if(err!=nil){
 			http.Error(w, fmt.Sprintf("Unable to create multi upload %q, %v", key, err), 500)
+			fmt.Println(fmt.Sprintf("Unable to create multi upload %q, %v", key, err))
 			return
 		}
 
-		err=updateMultipartUpload(w,key,svc,file,start,len)
+		err=updateMultipartUpload(w,key,svc,file,start,length)
 		if(err!=nil){
 			http.Error(w, fmt.Sprintf("Unable to upload part %q, %v", key, err), 500)
+			fmt.Println(fmt.Sprintf("Unable to upload part %q, %v", key, err))
 			return
 		}
 
 		err=completeMultipartUpload(w,key,svc)
 		if(err!=nil){
 			http.Error(w, fmt.Sprintf("Unable to complete %q, %v", key, err), 500)
+			fmt.Println(fmt.Sprintf("Unable to complete %q, %v", key, err))
 			return
 		}
 	}
@@ -153,6 +162,7 @@ func UploadS3MultipartStatus(w http.ResponseWriter, r *http.Request) {
 		key := r.Form.Get("key")
 		if key == "" {
 			http.Error(w, "file id is null", 500)
+			fmt.Println("file id is null")
 			return
 		}
 
@@ -168,12 +178,14 @@ func UploadS3MultipartStatus(w http.ResponseWriter, r *http.Request) {
 		output, err := svc.ListParts(listInput)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Unable to list parts of %q, %v", key, err), 500)
+			fmt.Println(fmt.Sprintf("Unable to list parts of %q, %v", key, err))
 			return
 		}
 		fmt.Printf("Successfully abort upload %q, %v\n", key, output)
 		x,err:=json.Marshal(output)
 		if(err!=nil){
 			http.Error(w, fmt.Sprintf("Unable to marshal, %v", key, err), 500)
+			fmt.Println(fmt.Sprintf("Unable to marshal, %v", key, err))
 			return
 		}
 		w.Write(x)
@@ -189,6 +201,7 @@ func UploadS3MultipartStop(w http.ResponseWriter, r *http.Request) {
 		key := r.Form.Get("key")
 		if key == "" {
 			http.Error(w, "file id is null", 500)
+			fmt.Println("file id is null")
 			return
 		}
 
@@ -205,6 +218,7 @@ func UploadS3MultipartStop(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// Print the error and exit.
 			http.Error(w, fmt.Sprintf("Unable to abort %q, %v", key, err), 500)
+			fmt.Println(fmt.Sprintf("Unable to abort %q, %v", key, err))
 			return
 		}
 		mockdb.Delete(key)
