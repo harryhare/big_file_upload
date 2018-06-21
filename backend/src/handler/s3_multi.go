@@ -14,6 +14,9 @@ import (
 	"mime"
 	"io"
 	"strconv"
+	"io/ioutil"
+	"github.com/aws/aws-sdk-go/aws/signer/v4"
+	"time"
 	"errors"
 )
 
@@ -35,15 +38,147 @@ func createMultipartUplaod(w http.ResponseWriter, key string,svc *s3.S3,len int)
 	return nil
 }
 
+type MyReader struct {
+	r io.Reader
+}
 
-func updateMultipartUpload(w http.ResponseWriter, key string,svc *s3.S3,file *multipart.Part,start int64, total int64)error{
+func (r*MyReader)Read(b []byte) (int,error) {
+	return r.r.Read(b)
+}
+func (r*MyReader)Close() error {
+	return nil
+}
+
+type SizedReader struct {
+	reader io.Reader
+	size   int64
+}
+
+func (tr *SizedReader) Read(p []byte) (n int, err error) {
+	n, err = tr.reader.Read(p)
+	tr.size += int64(n)
+	return n, err
+}
+
+func (tr *SizedReader) Size() int64 {
+	return tr.size
+}
+
+func NewSizedReader(reader io.Reader) *SizedReader {
+	return &SizedReader{size: 0, reader: reader}
+}
+
+
+func streamUploadPart(sess *session.Session,r *http.Request,w http.ResponseWriter, key string ,reader io.Reader,length int,part_number int,upload_id string) (*s3.UploadPartOutput,error ){
+	bucket := "paradox42"
+
+	//b,err:=ioutil.ReadAll(reader)
+	//body:=reader
+	//fmt.Println(len(b))
+	//uploadRequest, err := http.NewRequest(http.MethodPut, "https://s3.amazonaws.com/"+bucket+"/"+key, body)
+	url:=fmt.Sprintf("https://%s.s3.amazonaws.com/%s?partNumber=%d&uploadId=%s",bucket,key,part_number,upload_id)
+	fmt.Println(url)
+	uploadRequest, err := http.NewRequest(http.MethodPut,url ,reader)
+	if err != nil {
+		panic(err)
+	}
+
+	uploadRequest.ContentLength=int64(length)
+
+
+	//uploadRequest.Header.Add("Content-Disposition",
+	//fmt.Sprintf("attachment;filename=\"%s\"", key))
+	//uploadRequest.Header.Add("Content-Type", r.Header.Get("Content-Type"))
+	//uploadRequest.Header.Add("Content-Length",fmt.Sprintf("%d",length))
+	//uploadRequest.Header.Add("Transfer-Encoding","chunked")
+	//
+	//uploadRequest.Header.Del("Content-Transfer-Encoding")
+	uploadRequest.Header.Add("X-Amz-Content-Sha256", "UNSIGNED-PAYLOAD") // public-read
+	//uploadRequest.Header.Add("X-Amz-Acl", "public-read")
+
+
+
+
+
+
+	//fmt.Println(len(b))
+	body := uploadRequest.Body
+	signer := v4.NewSigner(sess.Config.Credentials)
+	if _,err := signer.Sign(uploadRequest,nil, "s3", "us-east-1", time.Now()); err != nil {
+		panic(err)
+	}
+
+	uploadRequest.Body=body
+
+
+	//buffer:=bytes.Buffer{}
+	//var l int=0
+	//for l<length {
+	//	dl, err := buffer.ReadFrom(body)
+	//	// todo: test copy(b,r.Read())
+	//	fmt.Printf("%d,%v\n", dl, err)
+	//	l+=int(dl)
+	//	if (err != nil && err != io.EOF) {
+	//		return nil,err
+	//	}
+	//}
+	//
+	//if(l!=length) {
+	//	fmt.Printf("actually read %d shoud read %d %v\n", l,length)
+	//	return nil,errors.New(fmt.Sprintf("file length error"))
+	//}
+
+
+	//var x io.ReadCloser
+	//x=MyReader{body}
+	//uploadRequest.Body = x
+
+	//uploadRequest.Body=ioutil.NopCloser(body)
+
+
+	fmt.Println(uploadRequest.Header)
+
+	client := &http.Client{}
+	fmt.Printf( "start upload stream mode, filename=%s, key=%s\n", key,key)
+	response, err := client.Do(uploadRequest)
+	fmt.Printf( "end upload stream mode, filename=%s, key=%s\n", key,key)
+
+
+	if err != nil {
+		panic(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		if errorContent, err := ioutil.ReadAll(response.Body); err != nil {
+			panic(err)
+		} else {
+			panic(fmt.Sprintf("error uploading to aws, response:%s", errorContent))
+		}
+	}
+	fmt.Println(response)
+	if(response.StatusCode!=200){
+		return nil,errors.New(fmt.Sprintf("upload part failed %d",part_number))
+	}
+	//resp,err:=ioutil.ReadAll(response.Body)
+	//if(err!=nil){
+	//	return nil,err
+	//}
+	etag:=response.Header.Get("Etag")
+	output:=&s3.UploadPartOutput{
+		ETag:&etag,
+	}
+	return output, nil
+}
+
+
+func updateMultipartUpload(sess *session.Session,request *http.Request,w http.ResponseWriter, key string,svc *s3.S3,file *multipart.Part,start int64, total int64)error{
 	var partNumber = int64(start)
 	//b:=make([]byte,0,block_size)
 	//buffer:=bytes.NewBuffer(b)
 	buffer:=bytes.Buffer{}
 	////limitReader test
 	//r:=io.LimitReader(file,20000)
-	//l,err:=r.Read(b)
+	//l,err:=r.Read(b)c
 	//fmt.Printf("read %d %v\n",l,err)
 	//left:=0
 	//for;true;{
@@ -68,30 +203,31 @@ func updateMultipartUpload(w http.ResponseWriter, key string,svc *s3.S3,file *mu
 			length = block_size
 		}
 		r:=io.LimitReader(file,block_size)
-		var l int64=0
-		for l<length {
-			dl, err := buffer.ReadFrom(r)
-			// todo: test copy(b,r.Read())
-			fmt.Printf("%d,%v\n", dl, err)
-			l+=int64(dl)
-			if (err != nil && err != io.EOF) {
-				return err
-			}
-		}
-
-		if(int64(l)!=length) {
-			fmt.Printf("actually read %d shoud read %d %v\n", l,length)
-			return errors.New(fmt.Sprintf("file length error"))
-		}
+		//var l int64=0
+		//for l<length {
+		//	dl, err := buffer.ReadFrom(r)
+		//	// todo: test copy(b,r.Read())
+		//	fmt.Printf("%d,%v\n", dl, err)
+		//	l+=int64(dl)
+		//	if (err != nil && err != io.EOF) {
+		//		return err
+		//	}
+		//}
+		//
+		//if(int64(l)!=length) {
+		//	fmt.Printf("actually read %d shoud read %d %v\n", l,length)
+		//	return errors.New(fmt.Sprintf("file length error"))
+		//}
 		fmt.Printf("len(buffer):%d ,length: %d\n",buffer.Len(),length)
-		output, err := svc.UploadPart(&s3.UploadPartInput{
-			Bucket:     	aws.String(myaws.Bucket),
-			UploadId:   	mockdb.Get(key).Id,
-			Key:        	aws.String(key),
-			PartNumber: 	&partNumber,
-			Body:       	bytes.NewReader(buffer.Bytes()),
-			ContentLength:	&length,
-		})
+		output,err:=streamUploadPart(sess,request,w,key,r,int(length),int(partNumber),*mockdb.Get(key).Id)
+		//output, err := svc.UploadPart(&s3.UploadPartInput{
+		//	Bucket:     	aws.String(myaws.Bucket),
+		//	UploadId:   	mockdb.Get(key).Id,
+		//	Key:        	aws.String(key),
+		//	PartNumber: 	&partNumber,
+		//	Body:       	bytes.NewReader(buffer.Bytes()),
+		//	ContentLength:	&length,
+		//})
 		if err != nil {
 			return err
 		}
@@ -240,12 +376,14 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err=updateMultipartUpload(w,key,svc,file,int64(start),int64(length))
+		println("create succ")
+		err=updateMultipartUpload(sess,r,w,key,svc,file,int64(start),int64(length))
 		if(err!=nil){
 			http.Error(w, fmt.Sprintf("Unable to upload part %q, %v", key, err), 500)
 			fmt.Println(fmt.Sprintf("Unable to upload part %q, %v", key, err))
 			return
 		}
+		println("upload succ")
 
 		err=completeMultipartUpload(w,key,svc)
 		if(err!=nil){
@@ -253,6 +391,7 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(fmt.Sprintf("Unable to complete %q, %v", key, err))
 			return
 		}
+		println("complete succ")
 	}
 }
 
