@@ -9,9 +9,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	myaws "aws"
 	"encoding/json"
-	"strconv"
 	"mime/multipart"
 	"bytes"
+	"mime"
+	"io"
+	"strconv"
 	"errors"
 )
 
@@ -34,25 +36,60 @@ func createMultipartUplaod(w http.ResponseWriter, key string,svc *s3.S3,len int)
 }
 
 
-func updateMultipartUpload(w http.ResponseWriter, key string,svc *s3.S3,file multipart.File,start int, total int)error{
+func updateMultipartUpload(w http.ResponseWriter, key string,svc *s3.S3,file *multipart.Part,start int64, total int64)error{
 	var partNumber = int64(start)
-	b:=make([]byte,block_size)
+	//b:=make([]byte,0,block_size)
+	//buffer:=bytes.NewBuffer(b)
+	buffer:=bytes.Buffer{}
+	////limitReader test
+	//r:=io.LimitReader(file,20000)
+	//l,err:=r.Read(b)
+	//fmt.Printf("read %d %v\n",l,err)
+	//left:=0
+	//for;true;{
+	//	l,err:=(file).Read(b)
+	//	fmt.Printf("read %d %v\n",l,err)
+	//	left+=l
+	//	if(err==io.EOF){
+	//		fmt.Printf("left:%d\n",left)
+	//		os.Exit(0)
+	//	}
+	//	if(err!=nil){
+	//		os.Exit(1)
+	//	}
+	//}
+
+
+
 	for left:=total;left>0;left-=block_size{
-		l,err:=file.Read(b)
-		if(err!=nil){
-			return err
+		buffer.Reset()
+		var length int64=int64(left)
+		if(length>block_size) {
+			length = block_size
 		}
-		length:=int64(l)
-		if(block_size<left && l!=block_size || block_size>=left && l!=left){
-			return errors.New("read uncomplete")
+		r:=io.LimitReader(file,block_size)
+		var l int64=0
+		for l<length {
+			dl, err := buffer.ReadFrom(r)
+			// todo: test copy(b,r.Read())
+			fmt.Printf("%d,%v\n", dl, err)
+			l+=int64(dl)
+			if (err != nil && err != io.EOF) {
+				return err
+			}
 		}
-		fmt.Printf("uploading part %d/%d\n",partNumber, len(mockdb.Get(key).Parts))
+
+		if(int64(l)!=length) {
+			fmt.Printf("actually read %d shoud read %d %v\n", l,length)
+			return errors.New(fmt.Sprintf("file length error"))
+		}
+		fmt.Printf("len(buffer):%d ,length: %d\n",buffer.Len(),length)
 		output, err := svc.UploadPart(&s3.UploadPartInput{
 			Bucket:     	aws.String(myaws.Bucket),
 			UploadId:   	mockdb.Get(key).Id,
 			Key:        	aws.String(key),
 			PartNumber: 	&partNumber,
-			Body:       	bytes.NewReader(b[:length]),
+			Body:       	bytes.NewReader(buffer.Bytes()),
 			ContentLength:	&length,
 		})
 		if err != nil {
@@ -91,44 +128,108 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/html")
 	w.Header().Add("Access-Control-Allow-Origin","*")
 	if "POST" == r.Method {
-		//id := r.Form.Get("id")
-		file, _, err := r.FormFile("file")
-		if err != nil {
-			fmt.Printf("form file error %v:",err)
-			http.Error(w, err.Error(), 500)
+		v := r.Header.Get("Content-Type")
+		if v == "" {
+			fmt.Println("Content-Type error")
 			return
 		}
-		defer file.Close()
-		key := r.Form.Get("key")
-		if key == "" {
-			fmt.Println("file key is null")
-			http.Error(w, "file key is null", 500)
+		d, params, err := mime.ParseMediaType(v)
+		if err != nil || d != "multipart/form-data" {
+			fmt.Println("Content-Type error")
 			return
 		}
-		len_str := r.Form.Get("len")
-		if key == "" {
-			fmt.Println("file len is null")
-			http.Error(w, "file len is null", 500)
+		//fmt.Println("content-type:")
+		//fmt.Println(v)
+		//fmt.Println(d)
+		//fmt.Println(params)
+
+		boundary, ok := params["boundary"]
+		if !ok {
+			fmt.Println("Content-Type")
 			return
 		}
-		length, err := strconv.Atoi(len_str)
-		if (err != nil) {
-			fmt.Println("file len is not int")
-			http.Error(w, "file len is not int", 500)
-			return
+		var key string
+		var length int
+		var start int
+		var file  *multipart.Part
+
+		mReader := multipart.NewReader(r.Body, boundary)
+		//to do try: r.MultipartReader()
+		for {
+			var part *multipart.Part
+			part, err = mReader.NextPart()
+			if err != nil {
+				panic(err)
+			}
+			if part.FormName() == "key" {
+				var b bytes.Buffer
+				_, err = io.Copy(&b, part)
+				if err != nil {
+					panic(err)
+				}
+				key=b.String()
+			}
+			if part.FormName() == "len" {
+				var b bytes.Buffer
+				_, err = io.Copy(&b, part)
+				if err != nil {
+					panic(err)
+				}
+				length,_=strconv.Atoi(b.String())
+			}
+
+			if part.FormName() == "start" {
+				var b bytes.Buffer
+				_, err = io.Copy(&b, part)
+				if err != nil {
+					panic(err)
+				}
+				start,_=strconv.Atoi(b.String())
+			}
+
+			if part.FormName() == "file" {
+				file = part
+				break
+			}
 		}
-		start_str := r.Form.Get("start")
-		if key == "" {
-			fmt.Println("start is null")
-			http.Error(w, "start is null", 500)
-			return
-		}
-		start, err := strconv.Atoi(start_str)
-		if (err != nil) {
-			fmt.Println("start is not int")
-			http.Error(w, "start is not int", 500)
-			return
-		}
+
+		//file, _, err := r.FormFile("file")
+		//if err != nil {
+		//	fmt.Printf("form file error %v:",err)
+		//	http.Error(w, err.Error(), 500)
+		//	return
+		//}
+		//defer file.Close()
+		//key := r.Form.Get("key")
+		//if key == "" {
+		//	fmt.Println("file key is null")
+		//	http.Error(w, "file key is null", 500)
+		//	return
+		//}
+		//len_str := r.Form.Get("len")
+		//if key == "" {
+		//	fmt.Println("file len is null")
+		//	http.Error(w, "file len is null", 500)
+		//	return
+		//}
+		//length, err := strconv.Atoi(len_str)
+		//if (err != nil) {
+		//	fmt.Println("file len is not int")
+		//	http.Error(w, "file len is not int", 500)
+		//	return
+		//}
+		//start_str := r.Form.Get("start")
+		//if key == "" {
+		//	fmt.Println("start is null")
+		//	http.Error(w, "start is null", 500)
+		//	return
+		//}
+		//start, err := strconv.Atoi(start_str)
+		//if (err != nil) {
+		//	fmt.Println("start is not int")
+		//	http.Error(w, "start is not int", 500)
+		//	return
+		//}
 		sess := session.Must(session.NewSession(&aws.Config{Region: aws.String("us-east-1")}))
 		svc := s3.New(sess)
 
@@ -139,7 +240,7 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err=updateMultipartUpload(w,key,svc,file,start,length)
+		err=updateMultipartUpload(w,key,svc,file,int64(start),int64(length))
 		if(err!=nil){
 			http.Error(w, fmt.Sprintf("Unable to upload part %q, %v", key, err), 500)
 			fmt.Println(fmt.Sprintf("Unable to upload part %q, %v", key, err))
