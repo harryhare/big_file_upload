@@ -21,10 +21,12 @@ var m map[string]*S3Object
 
 func Create(key string, reserve int,id *string){
 	m[key]=&S3Object{Parts:make([]*S3Part,reserve,reserve),Id:id}
+	Save()
 }
 
 func Add(key string,part *S3Part)  {
 	m[key].Parts[part.PartNumber-1]=part
+	Save()
 }
 
 func Get(key string)*S3Object{
@@ -33,14 +35,16 @@ func Get(key string)*S3Object{
 
 func Update(key string,part *S3Part,index int){
 	m[key].Parts[index]=part
+	Save()
 }
 
 func Delete(key string){
 	delete(m, key)
+	Save()
 }
 
 func Save()error{
-	file,err:=os.Create("db")
+	file,err:=os.Create("/Users/unity/git/big_file_upload/db")
 	defer file.Close()
 	if(err!=nil){
 		return errors.New(fmt.Sprintf("can not open db %v\n",err))
@@ -54,7 +58,7 @@ func Save()error{
 }
 
 func Load()error{
-	file,err:=os.Open("db")
+	file,err:=os.Open("/Users/unity/git/big_file_upload/db")
 	defer file.Close()
 	if(err!=nil){
 		//return errors.New(fmt.Sprintf("can not open db %v\n",err))

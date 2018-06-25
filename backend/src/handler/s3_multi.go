@@ -69,74 +69,29 @@ func NewSizedReader(reader io.Reader) *SizedReader {
 }
 
 
-func streamUploadPart(sess *session.Session,r *http.Request,w http.ResponseWriter, key string ,reader io.Reader,length int,part_number int,upload_id string) (*s3.UploadPartOutput,error ){
+func streamUploadPart(sess *session.Session,r *http.Request, key string ,reader io.Reader,length int,part_number int,upload_id string) (*s3.UploadPartOutput,error ){
 	bucket := "paradox42"
 
-	//b,err:=ioutil.ReadAll(reader)
-	//body:=reader
-	//fmt.Println(len(b))
-	//uploadRequest, err := http.NewRequest(http.MethodPut, "https://s3.amazonaws.com/"+bucket+"/"+key, body)
 	url:=fmt.Sprintf("https://%s.s3.amazonaws.com/%s?partNumber=%d&uploadId=%s",bucket,key,part_number,upload_id)
-	fmt.Println(url)
 	uploadRequest, err := http.NewRequest(http.MethodPut,url ,reader)
 	if err != nil {
 		panic(err)
 	}
 
+	uploadRequest.Header.Add("Content-Disposition",
+	fmt.Sprintf("attachment;filename=\"%s\"", key))
+	uploadRequest.Header.Add("Content-Type", r.Header.Get("Content-Type"))
 	uploadRequest.ContentLength=int64(length)
 
-
-	//uploadRequest.Header.Add("Content-Disposition",
-	//fmt.Sprintf("attachment;filename=\"%s\"", key))
-	//uploadRequest.Header.Add("Content-Type", r.Header.Get("Content-Type"))
-	//uploadRequest.Header.Add("Content-Length",fmt.Sprintf("%d",length))
-	//uploadRequest.Header.Add("Transfer-Encoding","chunked")
-	//
-	//uploadRequest.Header.Del("Content-Transfer-Encoding")
 	uploadRequest.Header.Add("X-Amz-Content-Sha256", "UNSIGNED-PAYLOAD") // public-read
 	//uploadRequest.Header.Add("X-Amz-Acl", "public-read")
 
-
-
-
-
-
-	//fmt.Println(len(b))
 	body := uploadRequest.Body
 	signer := v4.NewSigner(sess.Config.Credentials)
 	if _,err := signer.Sign(uploadRequest,nil, "s3", "us-east-1", time.Now()); err != nil {
 		panic(err)
 	}
-
 	uploadRequest.Body=body
-
-
-	//buffer:=bytes.Buffer{}
-	//var l int=0
-	//for l<length {
-	//	dl, err := buffer.ReadFrom(body)
-	//	// todo: test copy(b,r.Read())
-	//	fmt.Printf("%d,%v\n", dl, err)
-	//	l+=int(dl)
-	//	if (err != nil && err != io.EOF) {
-	//		return nil,err
-	//	}
-	//}
-	//
-	//if(l!=length) {
-	//	fmt.Printf("actually read %d shoud read %d %v\n", l,length)
-	//	return nil,errors.New(fmt.Sprintf("file length error"))
-	//}
-
-
-	//var x io.ReadCloser
-	//x=MyReader{body}
-	//uploadRequest.Body = x
-
-	//uploadRequest.Body=ioutil.NopCloser(body)
-
-
-	fmt.Println(uploadRequest.Header)
 
 	client := &http.Client{}
 	fmt.Printf( "start upload stream mode, filename=%s, key=%s\n", key,key)
@@ -145,7 +100,7 @@ func streamUploadPart(sess *session.Session,r *http.Request,w http.ResponseWrite
 
 
 	if err != nil {
-		panic(err)
+		return nil,err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
@@ -157,12 +112,12 @@ func streamUploadPart(sess *session.Session,r *http.Request,w http.ResponseWrite
 	}
 	fmt.Println(response)
 	if(response.StatusCode!=200){
-		return nil,errors.New(fmt.Sprintf("upload part failed %d",part_number))
+		resp,err:=ioutil.ReadAll(response.Body)
+		if(err!=nil){
+			return nil,err
+		}
+		return nil,errors.New(fmt.Sprintf("upload part failed %d,%s",part_number,resp))
 	}
-	//resp,err:=ioutil.ReadAll(response.Body)
-	//if(err!=nil){
-	//	return nil,err
-	//}
 	etag:=response.Header.Get("Etag")
 	output:=&s3.UploadPartOutput{
 		ETag:&etag,
@@ -173,20 +128,20 @@ func streamUploadPart(sess *session.Session,r *http.Request,w http.ResponseWrite
 
 func updateMultipartUpload(sess *session.Session,request *http.Request,w http.ResponseWriter, key string,svc *s3.S3,file *multipart.Part,start int64, total int64)error{
 	var partNumber = int64(start)
-	//b:=make([]byte,0,block_size)
-	//buffer:=bytes.NewBuffer(b)
-	buffer:=bytes.Buffer{}
+
+	//b:=make([]byte,block_size)
+	//buffer:=bytes.Buffer{}
 	////limitReader test
 	//r:=io.LimitReader(file,20000)
-	//l,err:=r.Read(b)c
+	//l,err:=r.Read(b)
 	//fmt.Printf("read %d %v\n",l,err)
-	//left:=0
+	//uploaded:=0
 	//for;true;{
 	//	l,err:=(file).Read(b)
 	//	fmt.Printf("read %d %v\n",l,err)
-	//	left+=l
+	//	uploaded+=l
 	//	if(err==io.EOF){
-	//		fmt.Printf("left:%d\n",left)
+	//		fmt.Printf("uploaded:%d\n",uploaded)
 	//		os.Exit(0)
 	//	}
 	//	if(err!=nil){
@@ -197,7 +152,7 @@ func updateMultipartUpload(sess *session.Session,request *http.Request,w http.Re
 
 
 	for left:=total;left>0;left-=block_size{
-		buffer.Reset()
+		//buffer.Reset()
 		var length int64=int64(left)
 		if(length>block_size) {
 			length = block_size
@@ -218,8 +173,8 @@ func updateMultipartUpload(sess *session.Session,request *http.Request,w http.Re
 		//	fmt.Printf("actually read %d shoud read %d %v\n", l,length)
 		//	return errors.New(fmt.Sprintf("file length error"))
 		//}
-		fmt.Printf("len(buffer):%d ,length: %d\n",buffer.Len(),length)
-		output,err:=streamUploadPart(sess,request,w,key,r,int(length),int(partNumber),*mockdb.Get(key).Id)
+		//fmt.Printf("len(buffer):%d ,length: %d\n",buffer.Len(),length)
+		output,err:=streamUploadPart(sess,request,key,r,int(length),int(partNumber),*mockdb.Get(key).Id)
 		//output, err := svc.UploadPart(&s3.UploadPartInput{
 		//	Bucket:     	aws.String(myaws.Bucket),
 		//	UploadId:   	mockdb.Get(key).Id,
@@ -274,10 +229,6 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("Content-Type error")
 			return
 		}
-		//fmt.Println("content-type:")
-		//fmt.Println(v)
-		//fmt.Println(d)
-		//fmt.Println(params)
 
 		boundary, ok := params["boundary"]
 		if !ok {
@@ -294,9 +245,13 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 		for {
 			var part *multipart.Part
 			part, err = mReader.NextPart()
+			if err == io.EOF{
+				break;
+			}
 			if err != nil {
 				panic(err)
 			}
+			fmt.Println(part.FormName())
 			if part.FormName() == "key" {
 				var b bytes.Buffer
 				_, err = io.Copy(&b, part)
@@ -376,14 +331,14 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		println("create succ")
+		fmt.Println("create succ")
 		err=updateMultipartUpload(sess,r,w,key,svc,file,int64(start),int64(length))
 		if(err!=nil){
 			http.Error(w, fmt.Sprintf("Unable to upload part %q, %v", key, err), 500)
 			fmt.Println(fmt.Sprintf("Unable to upload part %q, %v", key, err))
 			return
 		}
-		println("upload succ")
+		fmt.Println("upload succ")
 
 		err=completeMultipartUpload(w,key,svc)
 		if(err!=nil){
@@ -391,15 +346,68 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(fmt.Sprintf("Unable to complete %q, %v", key, err))
 			return
 		}
-		println("complete succ")
+		fmt.Println("complete succ")
+	}
+}
+
+
+
+func UploadS3MultipartOffset(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "json")
+	w.Header().Add("Access-Control-Allow-Origin","*")
+	if "GET" == r.Method {
+		//r.ParseForm()
+		fmt.Println(r.FormValue("key"))
+		key := r.FormValue("key")
+		if key == "" {
+			http.Error(w, "file id is null", 500)
+			fmt.Println("file id is null")
+			return
+		}
+
+		sess := session.Must(session.NewSession(&aws.Config{Region: aws.String("us-east-1")}))
+		svc := s3.New(sess)
+		id:=mockdb.Get(key).Id
+
+		listInput := &s3.ListPartsInput{
+			Bucket:   &myaws.Bucket,
+			Key:      &key,
+			UploadId: id,
+		}
+		fmt.Println(id)
+		output, err := svc.ListParts(listInput)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Unable to list parts of %q, %v", key, err), 500)
+			fmt.Println(fmt.Sprintf("Unable to list parts of %q, %v", key, err))
+			return
+		}
+		fmt.Printf("Successfully abort upload %q, %v\n", key, output)
+
+		byte_count:=int64(0)
+		for _,part :=range output.Parts{
+			byte_count += *part.Size
+		}
+		x,err:=json.Marshal(struct{
+			OffsetByte int64 `json:"offsetByte"`
+			OffsetBlock  int `json:"offsetBlock"`
+		}{byte_count,len(output.Parts)+1})
+		if(err!=nil){
+			http.Error(w, fmt.Sprintf("Unable to marshal, %v", key, err), 500)
+			fmt.Println(fmt.Sprintf("Unable to marshal, %v", key, err))
+			return
+		}
+		w.Write(x)
+		return
 	}
 }
 
 func UploadS3MultipartStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "json")
 	w.Header().Add("Access-Control-Allow-Origin","*")
-	if "POST" == r.Method {
-		key := r.Form.Get("key")
+	if "GET" == r.Method {
+		//r.ParseForm()
+		fmt.Println(r.FormValue("key"))
+		key := r.FormValue("key")
 		if key == "" {
 			http.Error(w, "file id is null", 500)
 			fmt.Println("file id is null")
@@ -421,7 +429,7 @@ func UploadS3MultipartStatus(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(fmt.Sprintf("Unable to list parts of %q, %v", key, err))
 			return
 		}
-		fmt.Printf("Successfully abort upload %q, %v\n", key, output)
+		fmt.Printf("upload status %q, %v\n", key, output)
 		x,err:=json.Marshal(output)
 		if(err!=nil){
 			http.Error(w, fmt.Sprintf("Unable to marshal, %v", key, err), 500)

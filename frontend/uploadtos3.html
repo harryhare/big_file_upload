@@ -6,16 +6,18 @@
     <script type="text/javascript">
         //图片上传
         var xhr;
+        var offsetByte=0;
         //上传文件方法
-        function UpladFile() {
+        function UpladFile(offset=0,offsetBlock=1) {
+            offsetByte=offset;
             var fileObj = document.getElementById("file").files[0]; // js 获取文件对象
             var url =  "http://localhost:8080" + "/api/s3/multi/upload"; // 接收上传文件的后台地址
 
             var form = new FormData(); // FormData 对象
             form.append("key",fileObj.name);
             form.append("len",fileObj.size.toString());
-            form.append("start",1);
-            form.append("file", fileObj); // 文件对象
+            form.append("start",offsetBlock);
+            form.append("file", fileObj.slice(offsetByte)); // 文件对象
 
             xhr = new XMLHttpRequest();  // XMLHttpRequest 对象
             //xhr.setRequestHeader("Access-Control-Allow-Origin","*");
@@ -61,8 +63,8 @@
             var percentageDiv = document.getElementById("percentage");
             // event.total是需要传输的总字节，event.loaded是已经传输的字节。如果event.lengthComputable不为真，则event.total等于0
             if (evt.lengthComputable) {//
-                progressBar.max = evt.total;
-                progressBar.value = evt.loaded;
+                progressBar.max = evt.total+offsetByte;
+                progressBar.value = evt.loaded+offsetByte;
                 percentageDiv.innerHTML = Math.round(evt.loaded / evt.total * 100) + "%";
             }
             var time = document.getElementById("time");
@@ -89,6 +91,47 @@
             time.innerHTML = '，速度：'+speed+units+'，剩余时间：'+resttime+'s';
             if(bspeed==0) time.innerHTML = '上传已取消';
         }
+        function  GetStatus(){
+            var fileObj = document.getElementById("file").files[0];
+            var url =  "http://localhost:8080" + "/api/s3/multi/status?key="+fileObj.name;
+            xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onreadystatechange=function(){
+                out_div=document.getElementById("status");
+                out_div.innerText=xhr.responseText
+            };
+            xhr.send(); //开始上传，发送form数据
+        }
+        function GetOffset() {
+            var fileObj = document.getElementById("file").files[0];
+            var url =  "http://localhost:8080" + "/api/s3/multi/offset?key="+fileObj.name;
+            xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onreadystatechange=function(){
+                out_div=document.getElementById("offset");
+                out_div.innerText=xhr.responseText;
+                console.warn(JSON.parse(xhr.responseText))
+            };
+            xhr.send(); //开始上传，发送form数据
+        }
+        function ContinueUploadFile() {
+            var fileObj = document.getElementById("file").files[0];
+            var url =  "http://localhost:8080" + "/api/s3/multi/offset?key="+fileObj.name;
+            xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onreadystatechange=function(){
+                out_div=document.getElementById("offset");
+                out_div.innerText=xhr.responseText;
+                x=JSON.parse(xhr.responseText);
+                console.warn(x);
+                UpladFile(x.offsetByte,x.offsetBlock)
+            };
+            xhr.send(); //开始上传，发送form数据
+        }
+        function test(x=1,y=2) {
+            console.log(x);
+            console.log(y);
+        }
     </script>
 </head>
 <body>
@@ -97,6 +140,18 @@
 <br /><br />
 <input type="file" id="file" name="myfile" />
 <input type="button" onclick="UpladFile()" value="上传" />
+<input type="button" onclick="ContinueUploadFile()" value="续传" />
 <input type="button" onclick="cancleUploadFile()" value="取消" />
+<br/>
+<br/>
+<input type="button" onclick="GetOffset()" value="offset">
+<br/>
+<div id="offset">1</div>
+<br/>
+<input type="button" onclick="GetStatus()" value="查看状态">
+<br/>
+<div id="status">  status: </div>
+<br/>
+<input type="button" onclick="test()" value="test">
 </body>
 </html>

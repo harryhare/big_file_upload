@@ -29,6 +29,12 @@ func Index(w http.ResponseWriter, r *http.Request) {
 func main() {
 	//aws.Test()
 	//os.Exit(0)
+	//x:=[]int{1,2,3}
+	//y:=[]int{4}
+	//copy(x,y)
+	//fmt.Println(x)
+	//fmt.Println(y)
+	//os.Exit(0)
 
 	mockdb.Load()
 	defer mockdb.Save()
@@ -43,6 +49,7 @@ func main() {
 	http.HandleFunc("/api/s3/list",  handler.ListS3)
 	http.HandleFunc("/api/s3/multi/upload",  handler.UploadS3MultipartUpload)
 	http.HandleFunc("/api/s3/multi/status",  handler.UploadS3MultipartStatus)
+	http.HandleFunc("/api/s3/multi/offset",handler.UploadS3MultipartOffset)
 	http.HandleFunc("/api/s3/multi/stop",  handler.UploadS3MultipartStop)
 
 	fmt.Println("listen on port 8080")
