@@ -174,6 +174,7 @@ func updateMultipartUpload(sess *session.Session,request *http.Request,w http.Re
 		//	return errors.New(fmt.Sprintf("file length error"))
 		//}
 		//fmt.Printf("len(buffer):%d ,length: %d\n",buffer.Len(),length)
+		fmt.Printf("upload part %d len %d\n",partNumber,length)
 		output,err:=streamUploadPart(sess,request,key,r,int(length),int(partNumber),*mockdb.Get(key).Id)
 		//output, err := svc.UploadPart(&s3.UploadPartInput{
 		//	Bucket:     	aws.String(myaws.Bucket),
@@ -321,17 +322,19 @@ func UploadS3MultipartUpload(w http.ResponseWriter, r *http.Request) {
 		//	http.Error(w, "start is not int", 500)
 		//	return
 		//}
+		fmt.Printf("upload start %d,total %d\n",start,length)
 		sess := session.Must(session.NewSession(&aws.Config{Region: aws.String("us-east-1")}))
 		svc := s3.New(sess)
-
-		err=createMultipartUplaod(w,key,svc,length)
-		if(err!=nil){
-			http.Error(w, fmt.Sprintf("Unable to create multi upload %q, %v", key, err), 500)
-			fmt.Println(fmt.Sprintf("Unable to create multi upload %q, %v", key, err))
-			return
+		if(start==1) {
+			err = createMultipartUplaod(w, key, svc, length)
+			if (err != nil) {
+				http.Error(w, fmt.Sprintf("Unable to create multi upload %q, %v", key, err), 500)
+				fmt.Println(fmt.Sprintf("Unable to create multi upload %q, %v", key, err))
+				return
+			}
+			fmt.Println("create succ")
 		}
 
-		fmt.Println("create succ")
 		err=updateMultipartUpload(sess,r,w,key,svc,file,int64(start),int64(length))
 		if(err!=nil){
 			http.Error(w, fmt.Sprintf("Unable to upload part %q, %v", key, err), 500)
@@ -381,7 +384,7 @@ func UploadS3MultipartOffset(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(fmt.Sprintf("Unable to list parts of %q, %v", key, err))
 			return
 		}
-		fmt.Printf("Successfully abort upload %q, %v\n", key, output)
+		fmt.Printf("upload status %q, %v\n", key, output)
 
 		byte_count:=int64(0)
 		for _,part :=range output.Parts{

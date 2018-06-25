@@ -15,7 +15,7 @@
 
             var form = new FormData(); // FormData 对象
             form.append("key",fileObj.name);
-            form.append("len",fileObj.size.toString());
+            form.append("len",(fileObj.size-offsetByte).toString());
             form.append("start",offsetBlock);
             form.append("file", fileObj.slice(offsetByte)); // 文件对象
 
@@ -63,9 +63,11 @@
             var percentageDiv = document.getElementById("percentage");
             // event.total是需要传输的总字节，event.loaded是已经传输的字节。如果event.lengthComputable不为真，则event.total等于0
             if (evt.lengthComputable) {//
+                console.warn(evt.total);
+                console.warn(evt.loaded);
                 progressBar.max = evt.total+offsetByte;
                 progressBar.value = evt.loaded+offsetByte;
-                percentageDiv.innerHTML = Math.round(evt.loaded / evt.total * 100) + "%";
+                percentageDiv.innerHTML = Math.round((evt.loaded+offsetByte) / (evt.total+offsetByte) * 100) + "%";
             }
             var time = document.getElementById("time");
             var nt = new Date().getTime();//获取当前时间
@@ -124,13 +126,22 @@
                 out_div.innerText=xhr.responseText;
                 x=JSON.parse(xhr.responseText);
                 console.warn(x);
-                UpladFile(x.offsetByte,x.offsetBlock)
+                UpladFile(parseInt(x.offsetByte),parseInt(x.offsetBlock))
             };
             xhr.send(); //开始上传，发送form数据
         }
-        function test(x=1,y=2) {
+        var xx=0;
+        function test() {
+            test1()
+            test2()
+        }
+        function test1(x=1,y=2) {
             console.log(x);
             console.log(y);
+            xx=10;
+        }
+        function test2(){
+            console.warn(xx)
         }
     </script>
 </head>
