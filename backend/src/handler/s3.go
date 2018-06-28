@@ -11,7 +11,7 @@ import (
 //save directly: after the client finish uploading, server still upload to s3
 func UploadS3(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/html")
-	w.Header().Add("Access-Control-Allow-Origin","*")
+	w.Header().Add("Access-Control-Allow-Origin", "*")
 	if "POST" == r.Method {
 		file, file_header, err := r.FormFile("file")
 		if err != nil {
@@ -39,11 +39,10 @@ func UploadS3(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 //save directly: after the client finish uploading, server still upload to s3
 func ListS3(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/html")
-	w.Header().Add("Access-Control-Allow-Origin","*")
+	w.Header().Add("Access-Control-Allow-Origin", "*")
 	if "POST" == r.Method {
 		file, file_header, err := r.FormFile("file")
 		if err != nil {

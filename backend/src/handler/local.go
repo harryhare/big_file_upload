@@ -9,7 +9,7 @@ import (
 
 func UploadLocal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/html")
-	w.Header().Add("Access-Control-Allow-Origin","*")
+	w.Header().Add("Access-Control-Allow-Origin", "*")
 	if "POST" == r.Method {
 		file, file_header, err := r.FormFile("file")
 		if err != nil {
@@ -35,7 +35,7 @@ func UploadLocal(w http.ResponseWriter, r *http.Request) {
 }
 func ListLocal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/html")
-	w.Header().Add("Access-Control-Allow-Origin","*")
+	w.Header().Add("Access-Control-Allow-Origin", "*")
 	if "POST" == r.Method {
 		file, file_header, err := r.FormFile("file")
 		if err != nil {

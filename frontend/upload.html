@@ -87,6 +87,12 @@
             time.innerHTML = '，速度：'+speed+units+'，剩余时间：'+resttime+'s';
             if(bspeed==0) time.innerHTML = '上传已取消';
         }
+        function test(){
+            var fileObj = document.getElementById("file").files[0];
+            console.warn("filename:"+fileObj.name);
+            var blob=fileObj.slice(0);
+            console.warn("blobname:"+blob.name);
+        }
     </script>
 </head>
 <body>
@@ -96,5 +102,6 @@
 <input type="file" id="file" name="myfile" />
 <input type="button" onclick="UpladFile()" value="上传" />
 <input type="button" onclick="cancleUploadFile()" value="取消" />
+<input type="button" onclick="test()" value="test">
 </body>
 </html>
